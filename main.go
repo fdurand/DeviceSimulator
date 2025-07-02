@@ -18,6 +18,7 @@ import (
 )
 
 type Interface struct {
+	Enabled   bool // Enable/Disable DHCP Discovery
 	Name      string
 	intNet    *net.Interface
 	ServerIP  net.IP           // DHCP Server IP (Destination IP)
@@ -31,6 +32,7 @@ type Interface struct {
 }
 
 type Upnp struct {
+	Enabled    bool // Enable/Disable UPnP Discovery
 	intNet     *net.Interface
 	UserAgent  string
 	IPAddr     net.IP
@@ -39,6 +41,7 @@ type Upnp struct {
 }
 
 type Accounting struct {
+	Enabled          bool   // Enable/Disable Radius Accounting
 	ServerIP         net.IP // Radius Accounting server IP
 	Secret           string // Radius Accounting secret
 	UserName         string
@@ -99,6 +102,24 @@ func (d *Interface) readDhcpConfig(config *Config) {
 		os.Exit(1)
 	}
 
+	enabled := cfg.Section("dhcp").Key("enabled")
+
+	if enabled != nil {
+		if enabled.String() == "true" || enabled.String() == "1" {
+			d.Enabled = true
+		} else if enabled.String() == "false" || enabled.String() == "0" {
+			d.Enabled = false
+		} else {
+			fmt.Printf("Invalid value for enabled: %s, defaulting to false\n", enabled.String())
+			d.Enabled = false
+		}
+	} else {
+		fmt.Println("No 'enabled' key found in the configuration, defaulting to false")
+		// Default to false if the key is not present
+		d.Enabled = false
+
+	}
+
 	Server := cfg.Section("dhcp").Key("server").String()
 	d.ServerIP = net.ParseIP(Server)
 
@@ -150,6 +171,23 @@ func (u *Upnp) readUpnpConfig(config *Config) {
 		os.Exit(1)
 	}
 
+	enabled := cfg.Section("upnp").Key("enabled")
+
+	if enabled != nil {
+		if enabled.String() == "true" || enabled.String() == "1" {
+			u.Enabled = true
+		} else if enabled.String() == "false" || enabled.String() == "0" {
+			u.Enabled = false
+		} else {
+			fmt.Printf("Invalid value for enabled: %s, defaulting to false\n", enabled.String())
+			u.Enabled = false
+		}
+	} else {
+		fmt.Println("No 'enabled' key found in the configuration, defaulting to false")
+		// Default to false if the key is not present
+		u.Enabled = false
+	}
+
 	UserAgent := cfg.Section("upnp").Key("useragent").String()
 	u.UserAgent = UserAgent
 
@@ -174,6 +212,23 @@ func (a *Accounting) readAccountingConfig(config *Config) {
 	if err != nil {
 		fmt.Printf("Fail to read file: %v", err)
 		os.Exit(1)
+	}
+
+	enabled := cfg.Section("accounting").Key("enabled")
+
+	if enabled != nil {
+		if enabled.String() == "true" || enabled.String() == "1" {
+			a.Enabled = true
+		} else if enabled.String() == "false" || enabled.String() == "0" {
+			a.Enabled = false
+		} else {
+			fmt.Printf("Invalid value for enabled: %s, defaulting to false\n", enabled.String())
+			a.Enabled = false
+		}
+	} else {
+		fmt.Println("No 'enabled' key found in the configuration, defaulting to false")
+		// Default to false if the key is not present
+		a.Enabled = false
 	}
 
 	server := cfg.Section("accounting").Key("server").String()
@@ -248,62 +303,71 @@ func main() {
 
 	u.intNet = c.intNet
 
-	go func() {
-		for {
-			u.discover(time.Second * 10)
+	if u.Enabled {
+		fmt.Println("UPnP Discovery is enabled")
+		go func() {
+			for {
+				u.discover(time.Second * 10)
 
-			time.Sleep(time.Second * 30)
-		}
-	}()
+				time.Sleep(time.Second * 30)
+			}
+		}()
+	}
 
 	var a Accounting
 	a.readAccountingConfig(configuration)
 	a.CallingStationId = d.ClientMAC.String()
 
-	go func() {
-		// Event-Timestamp = "Sep 27 2018 10:27:04 EDT"
-		// Acct-Input-Packets = 4622
-		// Acct-Output-Packets = 3494
-		// Acct-Input-Octets = 859981
-		// Acct-Output-Octets = 1250913
-		// Acct-Session-Time = 5400
-		// Acct-Input-Gigawords = 0
-		// Acct-Output-Gigawords = 0
+	if a.Enabled {
+		fmt.Println("Radius Accounting is enabled")
+		go func() {
+			// Event-Timestamp = "Sep 27 2018 10:27:04 EDT"
+			// Acct-Input-Packets = 4622
+			// Acct-Output-Packets = 3494
+			// Acct-Input-Octets = 859981
+			// Acct-Output-Octets = 1250913
+			// Acct-Session-Time = 5400
+			// Acct-Input-Gigawords = 0
+			// Acct-Output-Gigawords = 0
 
-	}()
-
-	// Random xid
-	xid := make([]byte, 4)
-	rand.Read(xid)
-
-	// Add options
-	var options = Options{}
-
-	// Read options from json file
-	dhcpOptions := options.ReadOptions(d.Options)
-
-	broadcast := false
-	if d.DstMac.String() == "FF:FF:FF:FF:FF:FF" {
-		broadcast = true
+		}()
 	}
 
-	// Request IP address
+	if d.Enabled {
+		fmt.Println("DHCP Discovery is enabled")
+		// Random xid
+		xid := make([]byte, 4)
+		rand.Read(xid)
 
-	packet := RequestPacket(dhcp4.Request, d.ClientMAC, d.GiAddr, d.CiAddr, xid, broadcast, dhcpOptions)
+		// Add options
+		var options = Options{}
 
-	Client, err := NewRawClient(d.intNet)
-	if err != nil {
-		fmt.Printf("Error : %s", err)
-		panic(err)
-	}
+		// Read options from json file
+		dhcpOptions := options.ReadOptions(d.Options)
 
-	for {
-		err = Client.sendDHCP(d.DstMac, d.SrcMac, packet, d.ServerIP, d.GiAddr)
+		broadcast := false
+		if d.DstMac.String() == "FF:FF:FF:FF:FF:FF" {
+			broadcast = true
+		}
+
+		// Request IP address
+
+		packet := RequestPacket(dhcp4.Request, d.ClientMAC, d.GiAddr, d.CiAddr, xid, broadcast, dhcpOptions)
+
+		Client, err := NewRawClient(d.intNet)
 		if err != nil {
 			fmt.Printf("Error : %s", err)
 			panic(err)
 		}
-		time.Sleep(d.Renew)
+
+		for {
+			err = Client.sendDHCP(d.DstMac, d.SrcMac, packet, d.ServerIP, d.GiAddr)
+			if err != nil {
+				fmt.Printf("Error : %s", err)
+				panic(err)
+			}
+			time.Sleep(d.Renew)
+		}
 	}
 
 }
