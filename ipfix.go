@@ -97,33 +97,63 @@ func (i *IpFix) readIpFixTraffic(traffic string) ([]Traffic, error) {
 
 // Generates a minimal IPFIX packet (header + one data set with fake values)
 func (i *IpFix) generateIPFIXPacket(traffic Traffic) []byte {
-	// IPFIX header is 16 bytes
-	packet := make([]byte, 16+traffic.Octets) // header + one data record (example size)
+	// --- Template Set ---
+	// IPFIX header: 16 bytes
+	// Template Set header: 4 bytes (Set ID + Length)
+	// Template Record: 4 bytes (Template ID + Field Count)
+	// Field Specifiers: 5 fields * 4 bytes each = 20 bytes
+	// Total template set: 4 + 4 + 20 = 28 bytes
+	templateSet := make([]byte, 4+4+20)
+	// Template Set header
+	binary.BigEndian.PutUint16(templateSet[0:2], 2)                        // Set ID for Template Set is 2
+	binary.BigEndian.PutUint16(templateSet[2:4], uint16(len(templateSet))) // Length
+	// Template Record
+	binary.BigEndian.PutUint16(templateSet[4:6], 256) // Template ID
+	binary.BigEndian.PutUint16(templateSet[6:8], 5)   // Field Count
 
-	// Header
-	binary.BigEndian.PutUint16(packet[0:2], 10)                        // Version (IPFIX)
-	binary.BigEndian.PutUint16(packet[2:4], uint16(len(packet)))       // Length
-	binary.BigEndian.PutUint32(packet[4:8], uint32(time.Now().Unix())) // Export Time
-	binary.BigEndian.PutUint32(packet[8:12], 1)                        // Sequence Number
-	binary.BigEndian.PutUint32(packet[12:16], 256)                     // Observation Domain ID
+	// Field Specifiers (Information Element ID, Field Length)
+	// SourceIPv4Address (8, 4)
+	binary.BigEndian.PutUint16(templateSet[8:10], 8)
+	binary.BigEndian.PutUint16(templateSet[10:12], 4)
+	// DestinationIPv4Address (12, 4)
+	binary.BigEndian.PutUint16(templateSet[12:14], 12)
+	binary.BigEndian.PutUint16(templateSet[14:16], 4)
+	// SourcePort (7, 2)
+	binary.BigEndian.PutUint16(templateSet[16:18], 7)
+	binary.BigEndian.PutUint16(templateSet[18:20], 2)
+	// DestinationPort (11, 2)
+	binary.BigEndian.PutUint16(templateSet[20:22], 11)
+	binary.BigEndian.PutUint16(templateSet[22:24], 2)
+	// PacketDeltaCount (2, 4)
+	binary.BigEndian.PutUint16(templateSet[24:26], 2)
+	binary.BigEndian.PutUint16(templateSet[26:28], 4)
 
-	// Data Set (Template ID 256, just as an example)
-	offset := 16
-	binary.BigEndian.PutUint16(packet[offset:offset+2], 256)                      // Set ID (Template ID)
-	binary.BigEndian.PutUint16(packet[offset+2:offset+4], uint16(traffic.Octets)) // Length of this set
+	// --- Data Set ---
+	// Data Set header: 4 bytes (Set ID + Length)
+	// Data Record: 4+4+2+2+4 = 16 bytes
+	dataSet := make([]byte, 4+16)
+	binary.BigEndian.PutUint16(dataSet[0:2], 256)                  // Set ID matches Template ID
+	binary.BigEndian.PutUint16(dataSet[2:4], uint16(len(dataSet))) // Length
 
-	// Fake data record (24 bytes, just for demonstration)
-	copy(packet[offset+4:offset+8], traffic.SourceIP.To4()) // src IP
-	copy(packet[offset+8:offset+12], traffic.DestinationIP.To4())
-	binary.BigEndian.PutUint16(packet[offset+12:offset+14], traffic.SourcePort)
-	binary.BigEndian.PutUint16(packet[offset+14:offset+16], traffic.DestinationPort)
-	binary.BigEndian.PutUint32(packet[offset+16:offset+20], traffic.Packets)
-	binary.BigEndian.PutUint32(packet[offset+20:offset+24], traffic.Octets)
+	offset := 4
+	copy(dataSet[offset:offset+4], traffic.SourceIP.To4())
+	copy(dataSet[offset+4:offset+8], traffic.DestinationIP.To4())
+	binary.BigEndian.PutUint16(dataSet[offset+8:offset+10], traffic.SourcePort)
+	binary.BigEndian.PutUint16(dataSet[offset+10:offset+12], traffic.DestinationPort)
+	binary.BigEndian.PutUint32(dataSet[offset+12:offset+16], traffic.Packets)
 
-	// Padding (if needed)
-	for i := offset + 24; i < offset+28; i++ {
-		packet[i] = 0
-	}
+	// --- IPFIX Message Header ---
+	totalLen := 16 + len(templateSet) + len(dataSet)
+	packet := make([]byte, totalLen)
+	binary.BigEndian.PutUint16(packet[0:2], 10) // Version
+	binary.BigEndian.PutUint16(packet[2:4], uint16(totalLen))
+	binary.BigEndian.PutUint32(packet[4:8], uint32(time.Now().Unix()))
+	binary.BigEndian.PutUint32(packet[8:12], 1)    // Sequence Number
+	binary.BigEndian.PutUint32(packet[12:16], 256) // Observation Domain ID
+
+	// Copy template set and data set into packet
+	copy(packet[16:], templateSet)
+	copy(packet[16+len(templateSet):], dataSet)
 
 	return packet
 }
