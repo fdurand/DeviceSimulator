@@ -66,7 +66,7 @@ type Options struct {
 }
 
 type Config struct {
-	ConfigFile *string
+	ConfigFile string
 }
 
 func (c *GlobalConfig) ReadGlobalConfig(config *Config) {
@@ -87,7 +87,7 @@ func (c *GlobalConfig) ReadGlobalConfig(config *Config) {
 	c.ClientMAC, err = net.ParseMAC(ClientMac)
 
 	if err != nil {
-		c.ClientMAC, err = net.ParseMAC("de:ad:be:ef:de:ad")
+		c.ClientMAC, _ = net.ParseMAC("de:ad:be:ef:de:ad")
 	}
 }
 
@@ -127,7 +127,7 @@ func (d *Interface) readDhcpConfig(config *Config) {
 	d.DstMac, err = net.ParseMAC(DstMac)
 
 	if err != nil {
-		d.DstMac, err = net.ParseMAC("FF:FF:FF:FF:FF:FF")
+		d.DstMac, _ = net.ParseMAC("FF:FF:FF:FF:FF:FF")
 	}
 
 	Renew := cfg.Section("dhcp").Key("renew").String()
@@ -231,7 +231,7 @@ func main() {
 
 	configuration := &Config{}
 
-	configuration.ConfigFile = flag.String("file", "/usr/local/etc/config.ini", "Configuration File Path")
+	configuration.ConfigFile = *flag.String("file", "/usr/local/etc/config.ini", "Configuration File Path")
 
 	var c GlobalConfig
 
