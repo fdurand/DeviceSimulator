@@ -60,18 +60,20 @@ func main() {
 	}()
 
 	configuration := &Config{}
+	configFile := flag.String("file", "/usr/local/etc/config.ini", "Configuration File Path")
 
-	configuration.ConfigFile = *flag.String("file", "/usr/local/etc/config.ini", "Configuration File Path")
+	flag.Parse()
+
+	configuration.ConfigFile = *configFile
 
 	var c GlobalConfig
 
 	c.ReadGlobalConfig(configuration)
 
 	var d Interface
-	d.readDhcpConfig(configuration)
-
 	d.intNet = c.intNet
 	d.ClientMAC = c.ClientMAC
+	d.readDhcpConfig(configuration)
 
 	var u Upnp
 	u.readUpnpConfig(configuration)
