@@ -24,7 +24,7 @@ type Accounting struct {
 	NASIPAddress     string
 }
 
-func (a *Accounting) readAccountingConfig(config *Config) {
+func (a *Accounting) ReadRadiusAccountingConfig(config *Config) {
 
 	cfg, err := ini.Load(config.ConfigFile)
 	if err != nil {

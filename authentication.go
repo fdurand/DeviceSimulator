@@ -23,7 +23,7 @@ type Authentication struct {
 	NASIPAddress     string
 }
 
-func (a *Authentication) readRadiusAuthenticationConfig(config *Config) {
+func (a *Authentication) ReadRadiusAuthenticationConfig(config *Config) {
 
 	cfg, err := ini.Load(config.ConfigFile)
 	if err != nil {
