@@ -117,7 +117,7 @@ func main() {
 	}
 
 	var auth Accounting
-	auth.readRadiusAccountingConfig(configuration)
+	auth.readRadiusAuthenticationConfig(configuration)
 	auth.CallingStationId = d.ClientMAC.String()
 	auth.UserName = d.ClientMAC.String()
 
