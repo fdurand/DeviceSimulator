@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"flag"
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/coreos/go-systemd/daemon"
 	"github.com/krolaw/dhcp4"
 	"gopkg.in/ini.v1"
+	"layeh.com/radius"
+	"layeh.com/radius/rfc2865"
+	"layeh.com/radius/rfc2869"
 )
 
 type GlobalConfig struct {
@@ -46,7 +51,8 @@ func (c *GlobalConfig) ReadGlobalConfig(config *Config) {
 
 func main() {
 
-	go func() {
+	ctx := context.Background()
+	go func(ctx context.Context) {
 		// Systemd
 		daemon.SdNotify(false, "READY=1")
 		interval, err := daemon.SdWatchdogEnabled(false)
@@ -57,7 +63,7 @@ func main() {
 			daemon.SdNotify(false, "WATCHDOG=1")
 			time.Sleep(interval / 3)
 		}
-	}()
+	}(ctx)
 
 	configuration := &Config{}
 	configFile := flag.String("file", "/usr/local/etc/config.ini", "Configuration File Path")
@@ -91,13 +97,13 @@ func main() {
 		}()
 	}
 
-	var a Accounting
-	a.readAccountingConfig(configuration)
-	a.CallingStationId = d.ClientMAC.String()
+	var acct Accounting
+	acct.readRadiusAccountingConfig(configuration)
+	acct.CallingStationId = d.ClientMAC.String()
 
-	if a.Enabled {
+	if acct.Enabled {
 		fmt.Println("Radius Accounting is enabled")
-		go func() {
+		go func(ctx context.Context) {
 			// Event-Timestamp = "Sep 27 2018 10:27:04 EDT"
 			// Acct-Input-Packets = 4622
 			// Acct-Output-Packets = 3494
@@ -107,7 +113,72 @@ func main() {
 			// Acct-Input-Gigawords = 0
 			// Acct-Output-Gigawords = 0
 
-		}()
+		}(ctx)
+	}
+
+	var auth Accounting
+	auth.readRadiusAccountingConfig(configuration)
+	auth.CallingStationId = d.ClientMAC.String()
+	auth.UserName = d.ClientMAC.String()
+
+	if auth.Enabled {
+		fmt.Println("Radius Authentication is enabled")
+		go func(ctx context.Context) {
+			client := radius.Client{
+				Retry: 3, // Number of retry attempts
+			}
+			packet := radius.New(radius.CodeAccessRequest, []byte(auth.Secret))
+
+			rfc2865.UserName_SetString(packet, auth.UserName)
+			rfc2865.UserPassword_SetString(packet, auth.UserName)
+			rfc2865.NASIPAddress_Set(packet, net.ParseIP(auth.NASIPAddress))
+
+			rfc2865.CallingStationID_AddString(packet, auth.CallingStationId)
+			rfc2865.CalledStationID_AddString(packet, auth.CalledStationId)
+
+			rfc2865.NASPortType_Add(packet, rfc2865.NASPortType_Value_Ethernet)
+
+			nasPort, err := strconv.Atoi(auth.NASPort)
+
+			if err != nil {
+				fmt.Printf("Error converting NASPort to integer: %s\n", err)
+				nasPort = 0 // Default to 0 if conversion fails
+			}
+
+			rfc2865.NASPort_Add(packet, rfc2865.NASPort(nasPort))
+
+			rfc2865.FramedIPAddress_Set(packet, net.ParseIP(auth.FramedIPAddress))
+			rfc2865.NASIdentifier_AddString(packet, auth.NASIdentifier)
+
+			rfc2869.NASPortID_AddString(packet, auth.NASPortId)
+
+			rfc2865.NASIPAddress_Set(packet, net.ParseIP(auth.NASIPAddress))
+
+			response, err := client.Exchange(ctx, packet, fmt.Sprintf("%s:%s", auth.ServerIP, "1812"))
+
+			if err != nil {
+				fmt.Printf("Error during RADIUS authentication: %s\n", err)
+				return
+			}
+			switch response.Code {
+			case radius.CodeAccessAccept:
+				fmt.Println("Authentication successful")
+			case radius.CodeAccessReject:
+				fmt.Println("Authentication rejected")
+			default:
+				fmt.Printf("Received unexpected response code: %s\n", response.Code)
+			}
+
+			if len(response.Attributes) > 0 {
+				fmt.Println("\nResponse attributes:")
+				for _, attr := range response.Attributes {
+					fmt.Printf("  Type: %d, Value: %x\n", attr.Type, attr.Attribute)
+				}
+			}
+
+			time.Sleep(time.Second * 10)
+
+		}(ctx)
 	}
 
 	var i IpFix
