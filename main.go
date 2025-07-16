@@ -154,29 +154,30 @@ func main() {
 
 			rfc2865.NASIPAddress_Set(packet, net.ParseIP(auth.NASIPAddress))
 
-			response, err := client.Exchange(ctx, packet, fmt.Sprintf("%s:%s", auth.ServerIP, "1812"))
+			for {
+				response, err := client.Exchange(ctx, packet, fmt.Sprintf("%s:%s", auth.ServerIP, "1812"))
 
-			if err != nil {
-				fmt.Printf("Error during RADIUS authentication: %s\n", err)
-				return
-			}
-			switch response.Code {
-			case radius.CodeAccessAccept:
-				fmt.Println("Authentication successful")
-			case radius.CodeAccessReject:
-				fmt.Println("Authentication rejected")
-			default:
-				fmt.Printf("Received unexpected response code: %s\n", response.Code)
-			}
-
-			if len(response.Attributes) > 0 {
-				fmt.Println("\nResponse attributes:")
-				for _, attr := range response.Attributes {
-					fmt.Printf("  Type: %d, Value: %x\n", attr.Type, attr.Attribute)
+				if err != nil {
+					fmt.Printf("Error during RADIUS authentication: %s\n", err)
+					return
 				}
-			}
+				switch response.Code {
+				case radius.CodeAccessAccept:
+					fmt.Println("Authentication successful")
+				case radius.CodeAccessReject:
+					fmt.Println("Authentication rejected")
+				default:
+					fmt.Printf("Received unexpected response code: %s\n", response.Code)
+				}
 
-			time.Sleep(time.Second * 10)
+				if len(response.Attributes) > 0 {
+					fmt.Println("\nResponse attributes:")
+					for _, attr := range response.Attributes {
+						fmt.Printf("  Type: %d, Value: %x\n", attr.Type, attr.Attribute)
+					}
+				}
+				time.Sleep(time.Second * 30) // Adjust the interval as needed
+			}
 
 		}(ctx)
 	}
