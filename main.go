@@ -124,9 +124,9 @@ func main() {
 	if auth.Enabled {
 		fmt.Println("Radius Authentication is enabled")
 		go func(ctx context.Context) {
-			client := radius.Client{
-				Retry: 3, // Number of retry attempts
-			}
+
+			client := radius.DefaultClient
+			client.MaxPacketErrors = 2
 			packet := radius.New(radius.CodeAccessRequest, []byte(auth.Secret))
 
 			rfc2865.UserName_SetString(packet, auth.UserName)
@@ -153,13 +153,12 @@ func main() {
 			rfc2869.NASPortID_AddString(packet, auth.NASPortId)
 
 			rfc2865.NASIPAddress_Set(packet, net.ParseIP(auth.NASIPAddress))
-
 			for {
 				response, err := client.Exchange(ctx, packet, fmt.Sprintf("%s:%s", auth.ServerIP, "1812"))
-
 				if err != nil {
 					fmt.Printf("Error during RADIUS authentication: %s\n", err)
-					return
+					time.Sleep(time.Second * 30)
+					continue
 				}
 				switch response.Code {
 				case radius.CodeAccessAccept:
@@ -186,7 +185,7 @@ func main() {
 	i.readIpFixConfig(configuration)
 	if i.Enabled {
 		fmt.Println("IPFIX is enabled")
-		go func() {
+		go func(ctx context.Context) {
 			traffic, err := i.readIpFixTraffic(i.Traffic)
 			if err != nil {
 				fmt.Printf("Error reading IPFIX traffic: %s", err)
@@ -199,7 +198,7 @@ func main() {
 				}
 				time.Sleep(time.Second * 10) // Adjust the interval as needed
 			}
-		}()
+		}(ctx)
 	}
 
 	if d.Enabled {
