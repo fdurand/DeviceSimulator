@@ -6,13 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/coreos/go-systemd/daemon"
 	"github.com/krolaw/dhcp4"
-	"gopkg.in/ini.v1"
 	"layeh.com/radius"
 	"layeh.com/radius/rfc2865"
 	"layeh.com/radius/rfc2869"
@@ -28,63 +26,90 @@ type Config struct {
 }
 
 func (c *GlobalConfig) ReadGlobalConfig(config *Config) {
-	cfg, err := ini.Load(config.ConfigFile)
+	// This method is deprecated, use ConfigManager instead
+	var err error
+	c.intNet, err = configManager.GetInterface()
 	if err != nil {
-		fmt.Printf("Fail to read file: %v", err)
-		os.Exit(1)
+		logger.Fatal("Failed to get network interface: %v", err)
 	}
+	c.ClientMAC = configManager.GetClientMAC()
+}
 
-	Interface := cfg.Section("general").Key("interface").String()
-	c.intNet, err = net.InterfaceByName(Interface)
-	if err != nil {
-		fmt.Printf("Fail to find network interface:%v, %v", Interface, err)
-		os.Exit(1)
+// startSystemdWatchdog starts the systemd watchdog if enabled
+func startSystemdWatchdog(ctx context.Context) {
+	daemon.SdNotify(false, "READY=1")
+	interval, err := daemon.SdWatchdogEnabled(false)
+	if err != nil || interval == 0 {
+		logger.Debug("Systemd watchdog not enabled")
+		return
 	}
-
-	ClientMac := cfg.Section("general").Key("clientmac").String()
-	c.ClientMAC, err = net.ParseMAC(ClientMac)
-
-	if err != nil {
-		c.ClientMAC, _ = net.ParseMAC("de:ad:be:ef:de:ad")
+	
+	logger.Info("Systemd watchdog enabled with interval: %v", interval)
+	
+	ticker := time.NewTicker(interval / 3)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Debug("Systemd watchdog stopped")
+			return
+		case <-ticker.C:
+			daemon.SdNotify(false, "WATCHDOG=1")
+		}
 	}
 }
 
 func main() {
-
-	ctx := context.Background()
-	go func(ctx context.Context) {
-		// Systemd
-		daemon.SdNotify(false, "READY=1")
-		interval, err := daemon.SdWatchdogEnabled(false)
-		if err != nil || interval == 0 {
-			return
-		}
-		for {
-			daemon.SdNotify(false, "WATCHDOG=1")
-			time.Sleep(interval / 3)
-		}
-	}(ctx)
-
-	configuration := &Config{}
+	// Parse command line flags
 	configFile := flag.String("file", "/usr/local/etc/config.ini", "Configuration File Path")
-
+	debug := flag.Bool("debug", false, "Enable debug logging")
 	flag.Parse()
 
-	configuration.ConfigFile = *configFile
+	// Initialize logger based on debug flag
+	logLevel := INFO
+	if *debug {
+		logLevel = DEBUG
+	}
+	logger = NewLogger(logLevel)
 
-	var c GlobalConfig
+	// Setup graceful shutdown
+	shutdown := NewGracefulShutdown()
+	
+	// Create context for cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+	shutdown.Register(func() error {
+		cancel()
+		return nil
+	})
 
-	c.ReadGlobalConfig(configuration)
+	// Load configuration
+	if err := configManager.LoadConfig(*configFile); err != nil {
+		logger.Fatal("Failed to load configuration: %v", err)
+	}
 
+	// Start systemd watchdog
+	go startSystemdWatchdog(ctx)
+
+	// Get network interface and client MAC with better error handling
+	netInterface, err := configManager.GetInterface()
+	if err != nil {
+		logger.Fatal("Failed to get network interface: %v", err)
+	}
+	clientMAC := configManager.GetClientMAC()
+
+	logger.Info("Using interface: %s, Client MAC: %s", netInterface.Name, clientMAC.String())
+
+	// Initialize DHCP interface
 	var d Interface
-	d.intNet = c.intNet
-	d.ClientMAC = c.ClientMAC
-	d.readDhcpConfig(configuration)
+	d.intNet = netInterface
+	d.ClientMAC = clientMAC
+	d.readDhcpConfigOptimized()
 
+	// Initialize UPnP
 	var u Upnp
-	u.readUpnpConfig(configuration)
-
-	u.intNet = c.intNet
+	u.readUpnpConfigOptimized()
+	u.intNet = netInterface
 
 	if u.Enabled {
 		fmt.Println("UPnP Discovery is enabled")
@@ -97,9 +122,10 @@ func main() {
 		}()
 	}
 
+	// Initialize RADIUS Accounting
 	var acct Accounting
-	acct.ReadRadiusAccountingConfig(configuration)
-	acct.CallingStationId = d.ClientMAC.String()
+	acct.ReadRadiusAccountingConfigOptimized()
+	acct.CallingStationId = clientMAC.String()
 
 	if acct.Enabled {
 		fmt.Println("Radius Accounting is enabled")
@@ -116,10 +142,11 @@ func main() {
 		}(ctx)
 	}
 
+	// Initialize RADIUS Authentication
 	var auth Authentication
-	auth.ReadRadiusAuthenticationConfig(configuration)
-	auth.CallingStationId = d.ClientMAC.String()
-	auth.UserName = d.ClientMAC.String()
+	auth.ReadRadiusAuthenticationConfigOptimized()
+	auth.CallingStationId = clientMAC.String()
+	auth.UserName = clientMAC.String()
 
 	if auth.Enabled {
 		fmt.Println("Radius Authentication is enabled")
@@ -181,8 +208,9 @@ func main() {
 		}(ctx)
 	}
 
+	// Initialize IPFIX
 	var i IpFix
-	i.readIpFixConfig(configuration)
+	i.readIpFixConfigOptimized()
 	if i.Enabled {
 		fmt.Println("IPFIX is enabled")
 		go func(ctx context.Context) {
