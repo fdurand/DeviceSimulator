@@ -43,7 +43,12 @@ Thumbs.db
 
 # Configuration files with sensitive data
 config.local.ini
+config-*.local.ini
 *.secret
+
+# Keep example configurations
+!config.ini
+!config-xerox-printer.ini
 
 # Service files
 *.service.local

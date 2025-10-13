@@ -73,6 +73,16 @@ run: build
 	@echo "Running DeviceSimulator..."
 	@sudo $(BINARY_PATH) -file $(CONFIG_FILE)
 
+# Run Xerox printer simulation
+run-xerox: build
+	@echo "Running Xerox Printer Simulation..."
+	@sudo $(BINARY_PATH) -file config-xerox-printer.ini
+
+# Run Xerox simulation with debug
+debug-xerox: debug
+	@echo "Running Xerox Printer Simulation (Debug Mode)..."
+	@sudo $(BINARY_PATH) -file config-xerox-printer.ini -debug
+
 # Install Go tools
 tools:
 	@echo "Installing development tools..."
@@ -102,20 +112,30 @@ docker:
 	@docker build -t device-simulator .
 	@echo "Docker image built: device-simulator"
 
+# Validate configurations
+validate:
+	@echo "Validating configurations..."
+	@chmod +x validate-xerox-config.sh
+	@./validate-xerox-config.sh
+	@echo "Validation completed"
+
 # Help
 help:
 	@echo "Available targets:"
-	@echo "  build     - Build optimized binary"
-	@echo "  debug     - Build debug binary with race detection"
-	@echo "  profile   - Build binary with profiling support"
-	@echo "  clean     - Clean build artifacts"
-	@echo "  test      - Run tests"
-	@echo "  test-race - Run tests with race detection"
-	@echo "  bench     - Run benchmarks"
-	@echo "  lint      - Lint code"
-	@echo "  run       - Build and run simulator"
-	@echo "  tools     - Install development tools"
-	@echo "  deps      - Update dependencies"
-	@echo "  coverage  - Generate test coverage report"
-	@echo "  docker    - Build Docker image"
-	@echo "  help      - Show this help"
+	@echo "  build       - Build optimized binary"
+	@echo "  debug       - Build debug binary with race detection"
+	@echo "  profile     - Build binary with profiling support"
+	@echo "  clean       - Clean build artifacts"
+	@echo "  test        - Run tests"
+	@echo "  test-race   - Run tests with race detection"
+	@echo "  bench       - Run benchmarks"
+	@echo "  lint        - Lint code"
+	@echo "  run         - Build and run default simulator"
+	@echo "  run-xerox   - Run Xerox printer simulation"
+	@echo "  debug-xerox - Run Xerox simulation with debug"
+	@echo "  validate    - Validate configuration files"
+	@echo "  tools       - Install development tools"
+	@echo "  deps        - Update dependencies"
+	@echo "  coverage    - Generate test coverage report"
+	@echo "  docker      - Build Docker image"
+	@echo "  help        - Show this help"

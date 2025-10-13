@@ -56,8 +56,20 @@ dstmac=fe:ff:ff:ff:ff:ff
 Run the simulator with appropriate privileges:
 
 ```bash
+# Default simulation
 sudo ./bin/device-simulator -file config.ini
+
+# Xerox printer simulation
+sudo ./bin/device-simulator -file config-xerox-printer.ini
+
+# Enable debug logging
+sudo ./bin/device-simulator -file config.ini -debug
 ```
+
+### Device Simulations
+
+- **`config.ini`**: Generic device simulation
+- **`config-xerox-printer.ini`**: Xerox VersaLink C405 printer simulation (see [XEROX-SIMULATION.md](XEROX-SIMULATION.md))
 
 ## Development
 

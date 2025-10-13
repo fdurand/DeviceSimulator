@@ -1,0 +1,38 @@
+[
+  {
+    "option": 12,
+    "value": "XRX-VersaLink-C405",
+    "type": "string",
+    "description": "Xerox printer hostname"
+  },
+  {
+    "option": 55,
+    "value": "1,2,3,6,15,26,28,51,58,59,119",
+    "type": "bytes",
+    "description": "Parameter request list for printers"
+  },
+  {
+    "option": 60,
+    "value": "Mfg=Xerox;Typ=MFP;Mod=VersaLink C405;Ser=VNB123456;",
+    "type": "string",
+    "description": "Xerox vendor class identifier"
+  },
+  {
+    "option": 43,
+    "value": "Xerox Network Printer",
+    "type": "string",
+    "description": "Vendor-specific information"
+  },
+  {
+    "option": 125,
+    "value": "FUJI XEROX",
+    "type": "string",
+    "description": "Vendor-identifying vendor class"
+  },
+  {
+    "option": 61,
+    "value": "f0:6d:ab:74:f5:a2",
+    "type": "string",
+    "description": "Client identifier (printer MAC)"
+  }
+]
