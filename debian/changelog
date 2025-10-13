@@ -1,0 +1,21 @@
+device-simulator (1.0.0) unstable; urgency=medium
+
+  * Initial release of DeviceSimulator
+  * Network device simulation for DHCP, RADIUS, IPFIX, and UPnP protocols
+  * Support for multiple device profiles (generic and Xerox printer)
+  * Performance optimizations with connection pooling and caching
+  * Comprehensive logging and metrics collection
+  * Systemd integration with watchdog support
+  * Configuration validation and management tools
+
+ -- Fabrice Durand <fdurand@example.com>  Sat, 12 Oct 2025 10:00:00 +0000
+
+device-simulator (0.9.0) unstable; urgency=low
+
+  * Beta release with core functionality
+  * DHCP client simulation
+  * RADIUS authentication and accounting
+  * IPFIX flow generation
+  * UPnP device discovery
+
+ -- Fabrice Durand <fdurand@example.com>  Mon, 01 Oct 2025 10:00:00 +0000

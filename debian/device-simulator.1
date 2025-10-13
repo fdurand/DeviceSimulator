@@ -1,0 +1,131 @@
+.TH DEVICE-SIMULATOR 1 "October 2025" "device-simulator 1.0.0" "User Commands"
+.SH NAME
+device-simulator \- Network device simulator for testing and monitoring
+
+.SH SYNOPSIS
+.B device-simulator
+[\fB\-file\fR \fIconfig-file\fR]
+[\fB\-debug\fR]
+
+.SH DESCRIPTION
+.B device-simulator
+is a comprehensive network device simulation tool that can emulate various network devices and their protocols for testing, monitoring, and validation purposes.
+
+The simulator supports multiple protocols including DHCP, RADIUS authentication and accounting, IPFIX flow generation, and UPnP device discovery. It can simulate realistic device behavior patterns for comprehensive network testing scenarios.
+
+.SH OPTIONS
+.TP
+\fB\-file\fR \fIconfig-file\fR
+Specify the configuration file path. Default is /usr/local/etc/config.ini
+.TP
+\fB\-debug\fR
+Enable debug logging for detailed output and troubleshooting
+
+.SH FILES
+.TP
+.I /etc/device-simulator/config.ini
+Default configuration file
+.TP
+.I /etc/device-simulator/config-xerox-printer.ini
+Xerox printer simulation configuration
+.TP
+.I /etc/device-simulator/xerox-dhcp-options.json
+Xerox DHCP options reference
+.TP
+.I /var/log/device-simulator/
+Log directory for device-simulator
+.TP
+.I /var/lib/device-simulator/
+Runtime data directory
+
+.SH EXAMPLES
+.TP
+Run default device simulation:
+.B sudo device-simulator -file /etc/device-simulator/config.ini
+
+.TP
+Run Xerox printer simulation:
+.B sudo device-simulator -file /etc/device-simulator/config-xerox-printer.ini
+
+.TP
+Run with debug logging:
+.B sudo device-simulator -file /etc/device-simulator/config.ini -debug
+
+.TP
+Using systemd service:
+.B sudo systemctl start device-simulator@default
+.B sudo systemctl start device-simulator@xerox-printer
+
+.SH SYSTEMD INTEGRATION
+The simulator integrates with systemd and supports:
+.TP
+\(bu Multiple instance management via templated service units
+.TP
+\(bu Watchdog support for automatic restart on failure
+.TP
+\(bu Proper capability management for raw socket operations
+.TP
+\(bu Journal logging integration
+
+Available systemd commands:
+.TP
+Start default profile:
+.B systemctl start device-simulator@default
+.TP
+Start xerox printer profile:
+.B systemctl start device-simulator@xerox-printer
+.TP
+Enable automatic startup:
+.B systemctl enable device-simulator@default
+
+.SH SECURITY CONSIDERATIONS
+The simulator requires root privileges to create raw sockets for packet injection. When running as a systemd service, it uses capability-based security to limit privileges to only what's necessary (CAP_NET_RAW and CAP_NET_ADMIN).
+
+Ensure proper network configuration and firewall settings before running simulations in production environments.
+
+.SH CONFIGURATION
+Configuration files use INI format with sections for different protocols:
+
+.TP
+\fB[general]\fR
+Network interface and device MAC address settings
+.TP
+\fB[dhcp]\fR
+DHCP client simulation parameters
+.TP
+\fB[radius]\fR
+RADIUS authentication and accounting settings
+.TP
+\fB[ipfix]\fR
+IPFIX flow generation configuration
+.TP
+\fB[upnp]\fR
+UPnP device discovery settings
+
+See example configuration files in /etc/device-simulator/ for detailed parameter descriptions.
+
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error (configuration, network, permissions)
+.TP
+.B 2
+Command line argument error
+
+.SH SEE ALSO
+.BR systemctl (1),
+.BR journalctl (1),
+.BR capabilities (7)
+
+.SH BUGS
+Report bugs to: https://github.com/fdurand/DeviceSimulator/issues
+
+.SH AUTHOR
+Written by Fabrice Durand.
+
+.SH COPYRIGHT
+Copyright \(co 2025 Fabrice Durand.
+Licensed under the Apache License, Version 2.0.

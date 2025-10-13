@@ -1,0 +1,3 @@
+etc/device-simulator/config.ini
+etc/device-simulator/config-xerox-printer.ini
+etc/device-simulator/xerox-dhcp-options.json

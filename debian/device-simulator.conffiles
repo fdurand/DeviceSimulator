@@ -1,0 +1,22 @@
+# DeviceSimulator Configuration Directory
+#
+# This directory contains configuration files for the DeviceSimulator
+# network device simulation tool.
+#
+# Files:
+#   config.ini               - Default configuration template
+#   config-xerox-printer.ini - Xerox printer simulation profile
+#   xerox-dhcp-options.json  - Xerox DHCP options reference
+#
+# Usage:
+#   Copy and modify configuration files as needed for your testing scenarios.
+#   
+# Examples:
+#   sudo device-simulator -file /etc/device-simulator/config.ini
+#   sudo device-simulator -file /etc/device-simulator/config-xerox-printer.ini
+#
+# Note: 
+#   The simulator requires root privileges to create raw sockets for packet injection.
+#   Ensure proper network interface configuration before running simulations.
+
+/etc/device-simulator/config-*.local.ini

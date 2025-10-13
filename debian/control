@@ -1,0 +1,52 @@
+Source: device-simulator
+Section: net
+Priority: optional
+Maintainer: Fabrice Durand <fdurand@example.com>
+Build-Depends: debhelper-compat (= 13),
+               golang-go,
+               dh-golang
+Standards-Version: 4.6.1
+Homepage: https://github.com/fdurand/DeviceSimulator
+Vcs-Git: https://github.com/fdurand/DeviceSimulator.git
+Vcs-Browser: https://github.com/fdurand/DeviceSimulator
+Rules-Requires-Root: no
+
+Package: device-simulator
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: systemd
+Suggests: network-manager, iproute2
+Description: Network device simulator for testing and monitoring
+ DeviceSimulator is a comprehensive network device simulation tool that can
+ emulate various network devices and their protocols for testing, monitoring,
+ and validation purposes.
+ .
+ Features include:
+  * DHCP client simulation with configurable options
+  * RADIUS authentication and accounting
+  * IPFIX flow generation for network monitoring
+  * UPnP device discovery and announcement
+  * Support for multiple device profiles (printers, cameras, etc.)
+  * Performance optimizations with connection pooling
+  * Systemd integration with watchdog support
+  * Comprehensive logging and metrics collection
+ .
+ This tool is particularly useful for:
+  * Network monitoring system testing
+  * Security policy validation
+  * Device management system development
+  * Network infrastructure testing
+
+Package: device-simulator-profiles
+Architecture: all
+Depends: device-simulator (>= ${binary:Version}), ${misc:Depends}
+Description: Additional device profiles for device-simulator
+ This package contains additional device configuration profiles for
+ device-simulator, including:
+  * Xerox printer simulation profiles
+  * IP camera simulation profiles  
+  * IoT device profiles
+  * Network appliance profiles
+ .
+ These profiles provide realistic device behavior patterns for comprehensive
+ network testing scenarios.

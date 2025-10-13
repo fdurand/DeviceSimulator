@@ -1,0 +1,26 @@
+#!/bin/bash
+# preinst script for device-simulator
+
+set -e
+
+case "$1" in
+    install|upgrade)
+        # Stop any running instances before installation/upgrade
+        if systemctl is-active --quiet device-simulator@* 2>/dev/null; then
+            echo "Stopping running device-simulator instances..."
+            systemctl stop device-simulator@* || true
+        fi
+        ;;
+        
+    abort-upgrade)
+        ;;
+        
+    *)
+        echo "preinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

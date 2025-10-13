@@ -1,0 +1,34 @@
+#!/bin/bash
+# postrm script for device-simulator
+
+set -e
+
+case "$1" in
+    purge)
+        # Remove user and directories on purge
+        if getent passwd device-simulator > /dev/null 2>&1; then
+            deluser device-simulator || true
+        fi
+        
+        # Remove directories if empty
+        rmdir /var/lib/device-simulator 2>/dev/null || true
+        rmdir /var/log/device-simulator 2>/dev/null || true
+        
+        # Remove configuration files if they exist
+        rm -rf /etc/device-simulator 2>/dev/null || true
+        
+        echo "DeviceSimulator has been completely removed."
+        ;;
+        
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+        
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

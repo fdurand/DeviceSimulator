@@ -1,0 +1,43 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+export GO111MODULE = on
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Build the main binary
+	CGO_ENABLED=0 go build -ldflags='-w -s -extldflags "-static"' \
+		-a -installsuffix cgo -o device-simulator .
+
+override_dh_auto_install:
+	# Install the binary
+	install -D -m 0755 device-simulator debian/device-simulator/usr/bin/device-simulator
+	
+	# Install configuration files
+	install -D -m 0644 config.ini debian/device-simulator/etc/device-simulator/config.ini
+	install -D -m 0644 config-xerox-printer.ini debian/device-simulator/etc/device-simulator/config-xerox-printer.ini
+	install -D -m 0644 xerox-dhcp-options.json debian/device-simulator/etc/device-simulator/xerox-dhcp-options.json
+	
+	# Install systemd service
+	install -D -m 0644 dhcpclient@.service debian/device-simulator/lib/systemd/system/device-simulator@.service
+	
+	# Install documentation
+	install -D -m 0644 README.md debian/device-simulator/usr/share/doc/device-simulator/README.md
+	install -D -m 0644 XEROX-SIMULATION.md debian/device-simulator/usr/share/doc/device-simulator/XEROX-SIMULATION.md
+	
+	# Install validation script
+	install -D -m 0755 validate-xerox-config.sh debian/device-simulator/usr/share/device-simulator/validate-xerox-config.sh
+
+override_dh_auto_test:
+	# Run tests but exclude network-dependent tests
+	go test -v ./...
+
+override_dh_systemd_enable:
+	# Don't enable the service by default since it requires configuration
+	dh_systemd_enable --no-enable
+
+override_dh_systemd_start:
+	# Don't start the service by default
+	dh_systemd_start --no-start

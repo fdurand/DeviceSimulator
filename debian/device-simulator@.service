@@ -1,0 +1,39 @@
+[Unit]
+Description=DeviceSimulator network device simulation for %i
+Documentation=man:device-simulator(1)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=root
+Group=root
+ExecStart=/usr/bin/device-simulator -file /etc/device-simulator/config-%i.ini
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/device-simulator /var/lib/device-simulator
+
+# Required capabilities for raw socket operations
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+
+# Watchdog settings
+WatchdogSec=60
+NotifyAccess=main
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=device-simulator-%i
+
+[Install]
+WantedBy=multi-user.target

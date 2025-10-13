@@ -1,7 +1,7 @@
 # DeviceSimulator Build Configuration
 
 # Build with optimizations
-.PHONY: build clean test lint run debug profile
+.PHONY: build clean test lint run debug profile deb-build deb-source deb-clean deb-install deb-remove deb-purge
 
 # Variables
 BINARY_NAME=device-simulator
@@ -106,18 +106,63 @@ coverage:
 	@go tool cover -html=coverage/coverage.out -o coverage/coverage.html
 	@echo "Coverage report generated: coverage/coverage.html"
 
-# Docker build (if needed)
-docker:
-	@echo "Building Docker image..."
-	@docker build -t device-simulator .
-	@echo "Docker image built: device-simulator"
-
 # Validate configurations
 validate:
 	@echo "Validating configurations..."
 	@chmod +x validate-xerox-config.sh
 	@./validate-xerox-config.sh
 	@echo "Validation completed"
+
+# Validate Debian package
+deb-validate:
+	@echo "Validating Debian package..."
+	@chmod +x validate-deb-package.sh
+	@./validate-deb-package.sh
+
+# Docker build (if needed)
+docker:
+	@echo "Building Docker image..."
+	@docker build -t device-simulator .
+	@echo "Docker image built: device-simulator"
+
+# Debian packaging
+deb-build:
+	@echo "Building Debian package..."
+	@chmod +x build-deb-package.sh
+	@./build-deb-package.sh
+
+deb-build-advanced:
+	@echo "Building Debian package (advanced)..."
+	@which debuild >/dev/null 2>&1 || (echo "Error: debuild not found. Install with: sudo apt-get install devscripts build-essential" && exit 1)
+	@debuild -us -uc -b
+	@echo "Debian package built successfully"
+
+deb-source:
+	@echo "Building Debian source package..."
+	@which debuild >/dev/null 2>&1 || (echo "Error: debuild not found. Install with: sudo apt-get install devscripts build-essential" && exit 1)
+	@debuild -S -us -uc
+	@echo "Debian source package built successfully"
+
+deb-clean:
+	@echo "Cleaning Debian build artifacts..."
+	@debuild clean || true
+	@rm -f ../device-simulator_*.deb ../device-simulator_*.dsc ../device-simulator_*.tar.* ../device-simulator_*.changes ../device-simulator_*.buildinfo
+	@echo "Debian artifacts cleaned"
+
+deb-install: deb-build
+	@echo "Installing Debian package..."
+	@sudo dpkg -i ../device-simulator_*.deb || (sudo apt-get install -f && sudo dpkg -i ../device-simulator_*.deb)
+	@echo "Package installed successfully"
+
+deb-remove:
+	@echo "Removing Debian package..."
+	@sudo dpkg -r device-simulator || true
+	@echo "Package removed"
+
+deb-purge:
+	@echo "Purging Debian package..."
+	@sudo dpkg -P device-simulator || true
+	@echo "Package purged"
 
 # Help
 help:
@@ -138,4 +183,9 @@ help:
 	@echo "  deps        - Update dependencies"
 	@echo "  coverage    - Generate test coverage report"
 	@echo "  docker      - Build Docker image"
-	@echo "  help        - Show this help"
+	@echo "  deb-build     - Build Debian package (simple)"
+	@echo "  deb-validate  - Validate built Debian package"
+	@echo "  deb-install   - Build and install Debian package"
+	@echo "  deb-remove    - Remove installed Debian package"
+	@echo "  deb-clean     - Clean Debian build artifacts"
+	@echo "  help          - Show this help"

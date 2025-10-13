@@ -1,0 +1,56 @@
+#!/bin/bash
+# postinst script for device-simulator
+
+set -e
+
+case "$1" in
+    configure)
+        # Create device-simulator user if it doesn't exist
+        if ! getent passwd device-simulator > /dev/null 2>&1; then
+            adduser --system --group --home /var/lib/device-simulator \
+                    --no-create-home --disabled-login \
+                    --gecos "DeviceSimulator Service User" device-simulator
+        fi
+        
+        # Create necessary directories
+        mkdir -p /var/lib/device-simulator
+        mkdir -p /var/log/device-simulator
+        
+        # Set proper ownership
+        chown device-simulator:device-simulator /var/lib/device-simulator
+        chown device-simulator:device-simulator /var/log/device-simulator
+        
+        # Set permissions for configuration directory
+        chmod 755 /etc/device-simulator
+        
+        # Inform user about configuration
+        echo "DeviceSimulator has been installed successfully."
+        echo ""
+        echo "Configuration files are located in /etc/device-simulator/"
+        echo "Available profiles:"
+        echo "  - config.ini (default)"
+        echo "  - config-xerox-printer.ini (Xerox printer simulation)"
+        echo ""
+        echo "To start a simulation:"
+        echo "  sudo systemctl start device-simulator@default"
+        echo "  sudo systemctl start device-simulator@xerox-printer"
+        echo ""
+        echo "To enable automatic startup:"
+        echo "  sudo systemctl enable device-simulator@default"
+        echo ""
+        echo "Note: Raw socket operations require root privileges."
+        echo "Ensure proper network configuration before running simulations."
+        ;;
+        
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+        
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0
