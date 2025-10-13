@@ -1,7 +1,7 @@
 Source: device-simulator
 Section: net
 Priority: optional
-Maintainer: Fabrice Durand <fdurand@example.com>
+Maintainer: Fabrice Durand <fdurand@inverse.ca>
 Build-Depends: debhelper-compat (= 13),
                golang-go,
                dh-golang

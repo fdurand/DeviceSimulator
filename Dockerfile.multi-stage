@@ -1,0 +1,116 @@
+# Multi-stage build for DeviceSimulator
+# This Dockerfile creates an optimized container image
+
+# Build stage
+FROM golang:1.24.5-alpine AS builder
+
+LABEL stage=builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    git \
+    ca-certificates \
+    tzdata \
+    make
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files first (for better layer caching)
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download && go mod verify
+
+# Copy source code
+COPY . .
+
+# Build the application with optimizations
+RUN make build
+
+# Test stage (optional - can be skipped in production builds)
+FROM builder AS tester
+
+# Run tests
+RUN go test -v ./...
+
+# Run benchmarks
+RUN go test -bench=. ./...
+
+# Validate configurations
+RUN chmod +x validate-xerox-config.sh && ./validate-xerox-config.sh
+
+# Final runtime stage
+FROM alpine:3.18 AS runtime
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    && adduser -D -s /bin/sh -u 1000 device-simulator
+
+# Create necessary directories
+RUN mkdir -p \
+    /etc/device-simulator \
+    /var/lib/device-simulator \
+    /var/log/device-simulator \
+    && chown -R device-simulator:device-simulator \
+       /var/lib/device-simulator \
+       /var/log/device-simulator
+
+# Copy the binary from builder stage
+COPY --from=builder /app/bin/device-simulator /usr/bin/device-simulator
+RUN chmod +x /usr/bin/device-simulator
+
+# Copy configuration files
+COPY --from=builder --chown=device-simulator:device-simulator \
+    /app/config.ini \
+    /app/config-xerox-printer.ini \
+    /app/xerox-dhcp-options.json \
+    /etc/device-simulator/
+
+# Copy documentation
+COPY --from=builder --chown=device-simulator:device-simulator \
+    /app/README.md \
+    /app/XEROX-SIMULATION.md \
+    /app/DEBIAN-PACKAGING.md \
+    /usr/share/doc/device-simulator/
+
+# Copy validation script
+COPY --from=builder --chown=device-simulator:device-simulator \
+    /app/validate-xerox-config.sh \
+    /usr/share/device-simulator/
+RUN chmod +x /usr/share/device-simulator/validate-xerox-config.sh
+
+# Set up volumes for persistent data
+VOLUME ["/var/lib/device-simulator", "/var/log/device-simulator"]
+
+# Note: Container needs --privileged or --cap-add=NET_RAW,NET_ADMIN for raw sockets
+# Also needs --network=host to access host network interfaces
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD /usr/bin/device-simulator -help > /dev/null 2>&1 || exit 1
+
+# Switch to non-root user (will need privileges at runtime for raw sockets)
+USER device-simulator
+
+# Set working directory
+WORKDIR /var/lib/device-simulator
+
+# Default entrypoint and command
+ENTRYPOINT ["/usr/bin/device-simulator"]
+CMD ["-file", "/etc/device-simulator/config.ini"]
+
+# Metadata labels
+LABEL maintainer="Fabrice Durand <fdurand@inverse.ca>"
+LABEL description="DeviceSimulator - Network device simulation for testing and monitoring"
+LABEL version="1.0.0"
+LABEL org.opencontainers.image.title="DeviceSimulator"
+LABEL org.opencontainers.image.description="Comprehensive network device simulation tool"
+LABEL org.opencontainers.image.source="https://github.com/fdurand/DeviceSimulator"
+LABEL org.opencontainers.image.url="https://github.com/fdurand/DeviceSimulator"
+LABEL org.opencontainers.image.documentation="https://github.com/fdurand/DeviceSimulator/blob/main/README.md"
+LABEL org.opencontainers.image.vendor="Fabrice Durand"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.created="2025-10-12"

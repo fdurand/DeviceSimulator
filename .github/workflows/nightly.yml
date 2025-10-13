@@ -1,0 +1,124 @@
+name: Nightly Builds
+
+on:
+  schedule:
+    # Run at 2 AM UTC every day
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.24.5'
+
+jobs:
+  nightly-test:
+    name: Nightly Extended Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Run extended tests with race detection
+      run: go test -v -race -count=10 -timeout=30m ./...
+      
+    - name: Run benchmarks
+      run: go test -bench=. -benchmem -count=5 ./...
+      
+    - name: Memory stress test
+      run: |
+        go test -v -run=TestMetricsConcurrency -count=100 ./...
+        go test -v -run=TestConfigManagerConcurrency -count=100 ./...
+        
+    - name: Build all platforms
+      run: |
+        GOOS=linux GOARCH=amd64 go build -o /tmp/device-simulator-linux-amd64 .
+        GOOS=linux GOARCH=arm64 go build -o /tmp/device-simulator-linux-arm64 .
+        GOOS=darwin GOARCH=amd64 go build -o /tmp/device-simulator-darwin-amd64 .
+        GOOS=darwin GOARCH=arm64 go build -o /tmp/device-simulator-darwin-arm64 .
+        GOOS=windows GOARCH=amd64 go build -o /tmp/device-simulator-windows-amd64.exe .
+        
+    - name: Configuration validation
+      run: |
+        chmod +x validate-xerox-config.sh
+        ./validate-xerox-config.sh
+        
+    - name: Package validation
+      run: |
+        chmod +x build-deb-package.sh
+        ./build-deb-package.sh
+        chmod +x validate-deb-package.sh
+        ./validate-deb-package.sh
+        
+  performance-regression:
+    name: Performance Regression Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Run performance benchmarks
+      run: |
+        mkdir -p benchmarks
+        go test -bench=. -benchmem -count=5 -benchtime=10s ./... | tee benchmarks/current.txt
+        
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results-${{ github.run_number }}
+        path: benchmarks/
+        retention-days: 30
+        
+  security-scan:
+    name: Nightly Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Download dependencies
+      run: go mod download
+      
+    - name: Run nancy vulnerability scan
+      run: |
+        go install github.com/sonatypecommunity/nancy@latest
+        go list -json -deps ./... | nancy sleuth
+        
+    - name: Run govulncheck
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+        
+    - name: Run gosec with all rules
+      run: |
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        gosec -severity medium -confidence medium -fmt json -out gosec-report.json ./...
+        
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports-${{ github.run_number }}
+        path: "*-report.json"
+        retention-days: 90

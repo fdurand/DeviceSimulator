@@ -1,0 +1,11 @@
+{
+  "alive-status-codes": [200, 206, 429],
+  "retry-count": 3,
+  "retry-delay": "2s",
+  "exclude-patterns": [
+    "http://localhost*",
+    "https://localhost*",
+    "http://127.0.0.1*",
+    "https://127.0.0.1*"
+  ]
+}

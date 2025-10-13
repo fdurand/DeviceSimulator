@@ -1,0 +1,132 @@
+name: Docker
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY_GHCR: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-test:
+    name: Build and Test Docker Images
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Login to GitHub Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY_GHCR }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        target: runtime
+        
+    - name: Build multi-stage Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.multi-stage
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: |
+          ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:multi-stage-latest
+          ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:multi-stage-${{ github.sha }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Test Docker image
+      run: |
+        # Test basic functionality
+        docker run --rm ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:latest -help
+        
+        # Test configuration validation
+        docker run --rm -v $(pwd):/workspace -w /workspace \
+          ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:latest \
+          /usr/share/device-simulator/validate-xerox-config.sh
+          
+    - name: Security scan with Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:latest
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  docker-compose-test:
+    name: Docker Compose Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Create docker-compose test file
+      run: |
+        cat > docker-compose.test.yml << 'EOF'
+        version: '3.8'
+        
+        services:
+          device-simulator-default:
+            build: .
+            privileged: true
+            network_mode: host
+            volumes:
+              - ./config.ini:/etc/device-simulator/config.ini:ro
+            command: ["-file", "/etc/device-simulator/config.ini", "-debug"]
+            
+          device-simulator-xerox:
+            build: .
+            privileged: true
+            network_mode: host
+            volumes:
+              - ./config-xerox-printer.ini:/etc/device-simulator/config-xerox-printer.ini:ro
+            command: ["-file", "/etc/device-simulator/config-xerox-printer.ini", "-debug"]
+        EOF
+        
+    - name: Test docker-compose configuration
+      run: |
+        docker-compose -f docker-compose.test.yml config
+        
+    - name: Build with docker-compose
+      run: |
+        docker-compose -f docker-compose.test.yml build

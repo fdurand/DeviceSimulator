@@ -1,0 +1,93 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.md'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.md'
+      - 'docs/**'
+
+jobs:
+  lint-docs:
+    name: Lint Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install markdownlint
+      run: npm install -g markdownlint-cli
+      
+    - name: Lint Markdown files
+      run: markdownlint '**/*.md' --ignore node_modules
+      
+  link-check:
+    name: Check Links
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check links in documentation
+      uses: gaurav-nelson/github-action-markdown-link-check@v1
+      with:
+        use-quiet-mode: 'yes'
+        use-verbose-mode: 'yes'
+        config-file: '.github/workflows/mlc_config.json'
+        
+  build-docs:
+    name: Build Documentation Site
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24.5'
+        
+    - name: Generate API documentation
+      run: |
+        go install golang.org/x/tools/cmd/godoc@latest
+        mkdir -p docs/api
+        godoc -html . > docs/api/index.html
+        
+    - name: Setup Node.js for documentation site
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install documentation dependencies
+      run: |
+        npm install -g @mermaid-js/mermaid-cli
+        
+    - name: Generate diagrams
+      run: |
+        mkdir -p docs/diagrams
+        # Generate network topology diagram if mermaid files exist
+        if [ -f docs/network-topology.mmd ]; then
+          mmdc -i docs/network-topology.mmd -o docs/diagrams/network-topology.svg
+        fi
+        
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: github.ref == 'refs/heads/main'
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs

@@ -1,14 +1,14 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: device-simulator
-Upstream-Contact: Fabrice Durand <fdurand@example.com>
+Upstream-Contact: Fabrice Durand <fdurand@inverse.ca>
 Source: https://github.com/fdurand/DeviceSimulator
 
 Files: *
-Copyright: 2025 Fabrice Durand <fdurand@example.com>
+Copyright: 2025 Fabrice Durand <fdurand@inverse.ca>
 License: Apache-2.0
 
 Files: debian/*
-Copyright: 2025 Fabrice Durand <fdurand@example.com>
+Copyright: 2025 Fabrice Durand <fdurand@inverse.ca>
 License: Apache-2.0
 
 License: Apache-2.0

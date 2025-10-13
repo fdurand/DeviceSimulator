@@ -8,7 +8,7 @@ set -e
 PACKAGE_NAME="device-simulator"
 VERSION="1.0.0"
 ARCH="amd64"
-MAINTAINER="Fabrice Durand <fdurand@example.com>"
+MAINTAINER="Fabrice Durand <fdurand@inverse.ca>"
 
 # Create package directory structure
 PKG_DIR="debian-package/${PACKAGE_NAME}_${VERSION}_${ARCH}"

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/fdurand/DeviceSimulator/blob/main/README.md
+    about: Read the documentation for setup and usage instructions
+  - name: 💬 Discussions
+    url: https://github.com/fdurand/DeviceSimulator/discussions
+    about: Ask questions and discuss with the community
+  - name: 🔐 Security Issues
+    url: https://github.com/fdurand/DeviceSimulator/security/policy
+    about: Report security vulnerabilities privately
