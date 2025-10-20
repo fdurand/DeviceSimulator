@@ -95,6 +95,65 @@ func (i *IpFix) readIpFixTraffic(traffic string) ([]Traffic, error) {
 	return IpFixTraffic, nil
 }
 
+// Helper function to parse MAC address from string format (e.g., "fa:cb:aa:c5:68:fa")
+func parseMACAddress(macStr string) ([]byte, error) {
+	if macStr == "" {
+		return nil, fmt.Errorf("empty MAC address")
+	}
+
+	mac, err := net.ParseMAC(macStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid MAC address format: %s", macStr)
+	}
+
+	return mac, nil
+}
+
+// Helper function to get device information from configManager
+func getDeviceInfo() (net.IP, []byte, error) {
+	// Get device IP address (ciaddr from dhcp section)
+	deviceIP := configManager.GetIP("dhcp", "ciaddr", nil)
+	if deviceIP == nil {
+		return nil, nil, fmt.Errorf("device IP address (ciaddr) not found in config")
+	}
+
+	// Get device MAC address (clientmac from general section)
+	clientmacStr := configManager.GetString("general", "clientmac", "")
+	if clientmacStr == "" {
+		return nil, nil, fmt.Errorf("device MAC address (clientmac) not found in config")
+	}
+
+	deviceMAC, err := parseMACAddress(clientmacStr)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse device MAC: %v", err)
+	}
+
+	return deviceIP, deviceMAC, nil
+}
+
+// Helper function to determine MAC addresses based on IP matching
+func determineMACAddresses(traffic Traffic, deviceIP net.IP, deviceMAC []byte) (srcMAC, dstMAC []byte) {
+	// Default MAC addresses for non-device endpoints
+	defaultSrcMAC := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+	defaultDstMAC := []byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
+
+	// Check if source IP matches device IP
+	if traffic.SourceIP.Equal(deviceIP) {
+		srcMAC = deviceMAC
+	} else {
+		srcMAC = defaultSrcMAC
+	}
+
+	// Check if destination IP matches device IP
+	if traffic.DestinationIP.Equal(deviceIP) {
+		dstMAC = deviceMAC
+	} else {
+		dstMAC = defaultDstMAC
+	}
+
+	return srcMAC, dstMAC
+}
+
 // Generates a comprehensive IPFIX packet with 23 fields matching the specification
 func (i *IpFix) generateIPFIXPacket(traffic Traffic) []byte {
 	// --- Template Set ---
@@ -264,8 +323,19 @@ func (i *IpFix) generateIPFIXPacket(traffic Traffic) []byte {
 
 	dataOffset := 4
 
-	// Field 1: SRC_MAC (6 bytes) - Generate dummy MAC
-	srcMAC := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+	// Get device information from configManager
+	deviceIP, deviceMAC, err := getDeviceInfo()
+	if err != nil {
+		fmt.Printf("Warning: Failed to get device info from config: %v. Using default MAC addresses.\n", err)
+		// Fallback to default MAC addresses
+		deviceIP = net.ParseIP("0.0.0.0") // This will never match, so defaults will be used
+		deviceMAC = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	}
+
+	// Determine MAC addresses based on IP matching
+	srcMAC, dstMAC := determineMACAddresses(traffic, deviceIP, deviceMAC)
+
+	// Field 1: SRC_MAC (6 bytes) - Use determined source MAC
 	copy(dataSet[dataOffset:dataOffset+6], srcMAC)
 	dataOffset += 6
 
@@ -273,16 +343,13 @@ func (i *IpFix) generateIPFIXPacket(traffic Traffic) []byte {
 	copy(dataSet[dataOffset:dataOffset+6], srcMAC)
 	dataOffset += 6
 
-	// Field 3: DESTINATION_MAC (6 bytes) - Generate dummy MAC
-	dstMAC := []byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
+	// Field 3: DESTINATION_MAC (6 bytes) - Use determined destination MAC
 	copy(dataSet[dataOffset:dataOffset+6], dstMAC)
 	dataOffset += 6
 
 	// Field 4: DST_MAC (6 bytes) - Same as DESTINATION_MAC
 	copy(dataSet[dataOffset:dataOffset+6], dstMAC)
-	dataOffset += 6
-
-	// Field 5: IP_SRC_ADDR (4 bytes)
+	dataOffset += 6 // Field 5: IP_SRC_ADDR (4 bytes)
 	copy(dataSet[dataOffset:dataOffset+4], traffic.SourceIP.To4())
 	dataOffset += 4
 
