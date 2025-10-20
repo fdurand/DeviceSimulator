@@ -5,11 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
-	"strconv"
 	"time"
-
-	"gopkg.in/ini.v1"
 )
 
 type IpFix struct {
@@ -27,55 +23,6 @@ type Traffic struct {
 	Packets         uint32 `json:"Packets"`
 	Octets          uint32 `json:"Octets"`
 	Protocol        string `json:"Protocol"`
-}
-
-func (i *IpFix) readIpFixConfig(config *Config) {
-
-	cfg, err := ini.Load(config.ConfigFile)
-	if err != nil {
-		fmt.Printf("Fail to read file: %v", err)
-		os.Exit(1)
-	}
-
-	enabled := cfg.Section("ipfix").Key("enabled")
-
-	if enabled != nil {
-		if enabled.String() == "true" || enabled.String() == "1" {
-			i.Enabled = true
-		} else if enabled.String() == "false" || enabled.String() == "0" {
-			i.Enabled = false
-		} else {
-			fmt.Printf("Invalid value for enabled: %s, defaulting to false\n", enabled.String())
-			i.Enabled = false
-		}
-	} else {
-		fmt.Println("No 'enabled' key found in the configuration, defaulting to false")
-		// Default to false if the key is not present
-		i.Enabled = false
-	}
-
-	DestinationIP := cfg.Section("ipfix").Key("destination_ip").String()
-
-	i.DestinationIP = net.ParseIP(DestinationIP)
-	if i.DestinationIP == nil {
-		fmt.Printf("Invalid IP address for destination_ip: %s\n", DestinationIP)
-	}
-
-	DestinationPort := cfg.Section("ipfix").Key("destination_port").String()
-	port, err := strconv.Atoi(DestinationPort)
-	if err != nil {
-		fmt.Printf("Invalid port number for destination_port: %s, defaulting to 4739\n", DestinationPort)
-		i.DestinationPort = 4739 // Default IPFIX port
-	} else {
-		i.DestinationPort = port
-	}
-	if i.DestinationPort < 1 || i.DestinationPort > 65535 {
-		fmt.Printf("Port number out of range for destination_port: %d, defaulting to 4739\n", i.DestinationPort)
-		i.DestinationPort = 4739 // Default IPFIX port
-	}
-
-	Traffic := cfg.Section("ipfix").Key("traffic").String()
-	i.Traffic = Traffic
 }
 
 func (i *IpFix) readIpFixTraffic(traffic string) ([]Traffic, error) {
@@ -294,7 +241,6 @@ func (i *IpFix) generateIPFIXPacket(traffic Traffic) []byte {
 	// Field 23: APPLICATION_ID (95, 4)
 	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 95)
 	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 4)
-	offset += 4
 
 	// --- Data Set ---
 	// Calculate data record size based on all 23 fields:
@@ -429,7 +375,6 @@ func (i *IpFix) generateIPFIXPacket(traffic Traffic) []byte {
 
 	// Field 23: APPLICATION_ID (4 bytes) - Generic application
 	binary.BigEndian.PutUint32(dataSet[dataOffset:dataOffset+4], 80) // HTTP application
-	dataOffset += 4
 
 	// --- IPFIX Message Header ---
 	totalLen := 16 + len(templateSet) + len(dataSet)
@@ -466,63 +411,4 @@ func (i *IpFix) sendIPFIX(packet []byte) {
 		return
 	}
 	fmt.Println("IPFIX packet sent successfully")
-}
-
-// Helper function to verify the template structure matches the specification
-func (i *IpFix) verifyTemplateStructure() {
-	fmt.Println("=== IPFIX Template Structure Verification ===")
-	fmt.Println("Set 1 [id=2] (Data Template): 257")
-	fmt.Println("  FlowSet Id: Data Template (V10 [IPFIX]) (2)")
-	fmt.Println("  FlowSet Length: 116")
-	fmt.Println("  Template (Id = 257, Count = 23)")
-	fmt.Println("    Template Id: 257")
-	fmt.Println("    Field Count: 23")
-
-	fields := []struct {
-		name       string
-		id         int
-		length     int
-		enterprise bool
-		pen        int
-	}{
-		{"SRC_MAC", 56, 6, false, 0},
-		{"SOURCE_MAC", 81, 6, false, 0},
-		{"DESTINATION_MAC", 80, 6, false, 0},
-		{"DST_MAC", 57, 6, false, 0},
-		{"IP_SRC_ADDR", 8, 4, false, 0},
-		{"IP_DST_ADDR", 12, 4, false, 0},
-		{"L4_SRC_PORT", 7, 2, false, 0},
-		{"L4_DST_PORT", 11, 2, false, 0},
-		{"TCP_FLAGS", 6, 1, false, 0},
-		{"DIRECTION", 61, 1, false, 0},
-		{"PKTS", 2, 8, false, 0},
-		{"flowStartMilliseconds", 152, 8, false, 0},
-		{"flowEndMilliseconds", 153, 8, false, 0},
-		{"biflowDirection", 239, 1, false, 0},
-		{"newConnectionDeltaCount", 278, 4, false, 0},
-		{"Connection client IPv4 address", 12236, 4, true, 9},
-		{"Connection client transport port", 12240, 2, true, 9},
-		{"Connection server IPv4 address", 12237, 4, true, 9},
-		{"Connection server transport port", 12241, 2, true, 9},
-		{"observationPointId", 138, 8, false, 0},
-		{"IP_PROTOCOL_VERSION", 60, 1, false, 0},
-		{"PROTOCOL", 4, 1, false, 0},
-		{"APPLICATION_ID", 95, 4, false, 0},
-	}
-
-	for i, field := range fields {
-		if field.enterprise {
-			fmt.Printf("    Field (%d/23): %s\n", i+1, field.name)
-			fmt.Printf("      1... .... .... .... = Pen provided: Yes\n")
-			fmt.Printf("      .%015b = Type: %s (%d)\n", field.id, field.name, field.id)
-			fmt.Printf("      Length: %d\n", field.length)
-			fmt.Printf("      PEN: ciscoSystems (%d)\n", field.pen)
-		} else {
-			fmt.Printf("    Field (%d/23): %s\n", i+1, field.name)
-			fmt.Printf("      0... .... .... .... = Pen provided: No\n")
-			fmt.Printf("      .%015b = Type: %s (%d)\n", field.id, field.name, field.id)
-			fmt.Printf("      Length: %d\n", field.length)
-		}
-	}
-	fmt.Println("=== End Template Structure ===")
 }
