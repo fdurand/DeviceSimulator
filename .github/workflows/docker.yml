@@ -54,7 +54,6 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        target: runtime
         
     - name: Build multi-stage Docker image
       uses: docker/build-push-action@v5
@@ -69,6 +68,7 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        target: runtime
         
     - name: Test Docker image
       run: |
