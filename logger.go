@@ -69,14 +69,14 @@ func SafeConfigRead(configFile string) error {
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		return fmt.Errorf("configuration file does not exist: %s", configFile)
 	}
-	
+
 	// Check if file is readable
 	file, err := os.Open(configFile)
 	if err != nil {
 		return fmt.Errorf("cannot read configuration file: %v", err)
 	}
 	defer file.Close()
-	
+
 	return nil
 }
 

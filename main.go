@@ -43,12 +43,12 @@ func startSystemdWatchdog(ctx context.Context) {
 		logger.Debug("Systemd watchdog not enabled")
 		return
 	}
-	
+
 	logger.Info("Systemd watchdog enabled with interval: %v", interval)
-	
+
 	ticker := time.NewTicker(interval / 3)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -75,7 +75,7 @@ func main() {
 
 	// Setup graceful shutdown
 	shutdown := NewGracefulShutdown()
-	
+
 	// Create context for cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	shutdown.Register(func() error {
