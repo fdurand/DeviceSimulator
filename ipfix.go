@@ -95,52 +95,274 @@ func (i *IpFix) readIpFixTraffic(traffic string) ([]Traffic, error) {
 	return IpFixTraffic, nil
 }
 
-// Generates a minimal IPFIX packet (header + one data set with fake values)
+// Generates a comprehensive IPFIX packet with 23 fields matching the specification
 func (i *IpFix) generateIPFIXPacket(traffic Traffic) []byte {
 	// --- Template Set ---
 	// IPFIX header: 16 bytes
 	// Template Set header: 4 bytes (Set ID + Length)
 	// Template Record: 4 bytes (Template ID + Field Count)
-	// Field Specifiers: 5 fields * 4 bytes each = 20 bytes
-	// Total template set: 4 + 4 + 20 = 28 bytes
-	templateSet := make([]byte, 4+4+20)
-	// Template Set header
-	binary.BigEndian.PutUint16(templateSet[0:2], 2)                        // Set ID for Template Set is 2
-	binary.BigEndian.PutUint16(templateSet[2:4], uint16(len(templateSet))) // Length
-	// Template Record
-	binary.BigEndian.PutUint16(templateSet[4:6], 256) // Template ID
-	binary.BigEndian.PutUint16(templateSet[6:8], 5)   // Field Count
+	// Field Specifiers: 23 fields (19 standard + 4 enterprise-specific)
+	// Standard fields: 19 * 4 bytes = 76 bytes
+	// Enterprise fields: 4 * 8 bytes (4 bytes type + 4 bytes PEN) = 32 bytes
+	// Total field specifiers: 76 + 32 = 108 bytes
+	// Total template set: 4 + 4 + 108 = 116 bytes
+	templateSet := make([]byte, 116)
 
-	// Field Specifiers (Information Element ID, Field Length)
-	// SourceIPv4Address (8, 4)
-	binary.BigEndian.PutUint16(templateSet[8:10], 8)
-	binary.BigEndian.PutUint16(templateSet[10:12], 4)
-	// DestinationIPv4Address (12, 4)
-	binary.BigEndian.PutUint16(templateSet[12:14], 12)
-	binary.BigEndian.PutUint16(templateSet[14:16], 4)
-	// SourcePort (7, 2)
-	binary.BigEndian.PutUint16(templateSet[16:18], 7)
-	binary.BigEndian.PutUint16(templateSet[18:20], 2)
-	// DestinationPort (11, 2)
-	binary.BigEndian.PutUint16(templateSet[20:22], 11)
-	binary.BigEndian.PutUint16(templateSet[22:24], 2)
-	// PacketDeltaCount (2, 4)
-	binary.BigEndian.PutUint16(templateSet[24:26], 2)
-	binary.BigEndian.PutUint16(templateSet[26:28], 4)
+	// Template Set header
+	binary.BigEndian.PutUint16(templateSet[0:2], 2)   // Set ID for Template Set is 2
+	binary.BigEndian.PutUint16(templateSet[2:4], 116) // Length
+
+	// Template Record
+	binary.BigEndian.PutUint16(templateSet[4:6], 257) // Template ID = 257
+	binary.BigEndian.PutUint16(templateSet[6:8], 23)  // Field Count = 23
+
+	offset := 8
+
+	// Field 1: SRC_MAC (56, 6)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 56)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 6)
+	offset += 4
+
+	// Field 2: SOURCE_MAC (81, 6)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 81)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 6)
+	offset += 4
+
+	// Field 3: DESTINATION_MAC (80, 6)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 80)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 6)
+	offset += 4
+
+	// Field 4: DST_MAC (57, 6)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 57)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 6)
+	offset += 4
+
+	// Field 5: IP_SRC_ADDR (8, 4)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 8)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 4)
+	offset += 4
+
+	// Field 6: IP_DST_ADDR (12, 4)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 12)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 4)
+	offset += 4
+
+	// Field 7: L4_SRC_PORT (7, 2)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 7)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 2)
+	offset += 4
+
+	// Field 8: L4_DST_PORT (11, 2)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 11)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 2)
+	offset += 4
+
+	// Field 9: TCP_FLAGS (6, 1)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 6)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 1)
+	offset += 4
+
+	// Field 10: DIRECTION (61, 1)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 61)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 1)
+	offset += 4
+
+	// Field 11: PKTS (2, 8)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 2)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 8)
+	offset += 4
+
+	// Field 12: flowStartMilliseconds (152, 8)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 152)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 8)
+	offset += 4
+
+	// Field 13: flowEndMilliseconds (153, 8)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 153)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 8)
+	offset += 4
+
+	// Field 14: biflowDirection (239, 1)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 239)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 1)
+	offset += 4
+
+	// Field 15: newConnectionDeltaCount (278, 4)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 278)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 4)
+	offset += 4
+
+	// Field 16: Connection client IPv4 address (Enterprise field: type 12236, PEN 9, length 4)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 0x8000|12236) // Set enterprise bit
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 4)
+	binary.BigEndian.PutUint32(templateSet[offset+4:offset+8], 9) // PEN: ciscoSystems
+	offset += 8
+
+	// Field 17: Connection client transport port (Enterprise field: type 12240, PEN 9, length 2)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 0x8000|12240) // Set enterprise bit
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 2)
+	binary.BigEndian.PutUint32(templateSet[offset+4:offset+8], 9) // PEN: ciscoSystems
+	offset += 8
+
+	// Field 18: Connection server IPv4 address (Enterprise field: type 12237, PEN 9, length 4)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 0x8000|12237) // Set enterprise bit
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 4)
+	binary.BigEndian.PutUint32(templateSet[offset+4:offset+8], 9) // PEN: ciscoSystems
+	offset += 8
+
+	// Field 19: Connection server transport port (Enterprise field: type 12241, PEN 9, length 2)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 0x8000|12241) // Set enterprise bit
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 2)
+	binary.BigEndian.PutUint32(templateSet[offset+4:offset+8], 9) // PEN: ciscoSystems
+	offset += 8
+
+	// Field 20: observationPointId (138, 8)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 138)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 8)
+	offset += 4
+
+	// Field 21: IP_PROTOCOL_VERSION (60, 1)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 60)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 1)
+	offset += 4
+
+	// Field 22: PROTOCOL (4, 1)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 4)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 1)
+	offset += 4
+
+	// Field 23: APPLICATION_ID (95, 4)
+	binary.BigEndian.PutUint16(templateSet[offset:offset+2], 95)
+	binary.BigEndian.PutUint16(templateSet[offset+2:offset+4], 4)
+	offset += 4
 
 	// --- Data Set ---
-	// Data Set header: 4 bytes (Set ID + Length)
-	// Data Record: 4+4+2+2+4 = 16 bytes
-	dataSet := make([]byte, 4+16)
-	binary.BigEndian.PutUint16(dataSet[0:2], 256)                  // Set ID matches Template ID
+	// Calculate data record size based on all 23 fields:
+	// MAC addresses: 6+6+6+6 = 24 bytes
+	// IP addresses: 4+4 = 8 bytes
+	// Ports: 2+2 = 4 bytes
+	// TCP flags: 1 byte
+	// Direction: 1 byte
+	// Packets: 8 bytes
+	// Flow times: 8+8 = 16 bytes
+	// Biflow direction: 1 byte
+	// New connection count: 4 bytes
+	// Connection client IP: 4 bytes
+	// Connection client port: 2 bytes
+	// Connection server IP: 4 bytes
+	// Connection server port: 2 bytes
+	// Observation point: 8 bytes
+	// IP protocol version: 1 byte
+	// Protocol: 1 byte
+	// Application ID: 4 bytes
+	// Total: 24+8+4+1+1+8+16+1+4+4+2+4+2+8+1+1+4 = 93 bytes
+	dataRecordSize := 93
+	dataSet := make([]byte, 4+dataRecordSize)
+	binary.BigEndian.PutUint16(dataSet[0:2], 257)                  // Set ID matches Template ID (257)
 	binary.BigEndian.PutUint16(dataSet[2:4], uint16(len(dataSet))) // Length
 
-	offset := 4
-	copy(dataSet[offset:offset+4], traffic.SourceIP.To4())
-	copy(dataSet[offset+4:offset+8], traffic.DestinationIP.To4())
-	binary.BigEndian.PutUint16(dataSet[offset+8:offset+10], traffic.SourcePort)
-	binary.BigEndian.PutUint16(dataSet[offset+10:offset+12], traffic.DestinationPort)
-	binary.BigEndian.PutUint32(dataSet[offset+12:offset+16], traffic.Packets)
+	dataOffset := 4
+
+	// Field 1: SRC_MAC (6 bytes) - Generate dummy MAC
+	srcMAC := []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
+	copy(dataSet[dataOffset:dataOffset+6], srcMAC)
+	dataOffset += 6
+
+	// Field 2: SOURCE_MAC (6 bytes) - Same as SRC_MAC
+	copy(dataSet[dataOffset:dataOffset+6], srcMAC)
+	dataOffset += 6
+
+	// Field 3: DESTINATION_MAC (6 bytes) - Generate dummy MAC
+	dstMAC := []byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
+	copy(dataSet[dataOffset:dataOffset+6], dstMAC)
+	dataOffset += 6
+
+	// Field 4: DST_MAC (6 bytes) - Same as DESTINATION_MAC
+	copy(dataSet[dataOffset:dataOffset+6], dstMAC)
+	dataOffset += 6
+
+	// Field 5: IP_SRC_ADDR (4 bytes)
+	copy(dataSet[dataOffset:dataOffset+4], traffic.SourceIP.To4())
+	dataOffset += 4
+
+	// Field 6: IP_DST_ADDR (4 bytes)
+	copy(dataSet[dataOffset:dataOffset+4], traffic.DestinationIP.To4())
+	dataOffset += 4
+
+	// Field 7: L4_SRC_PORT (2 bytes)
+	binary.BigEndian.PutUint16(dataSet[dataOffset:dataOffset+2], traffic.SourcePort)
+	dataOffset += 2
+
+	// Field 8: L4_DST_PORT (2 bytes)
+	binary.BigEndian.PutUint16(dataSet[dataOffset:dataOffset+2], traffic.DestinationPort)
+	dataOffset += 2
+
+	// Field 9: TCP_FLAGS (1 byte) - SYN+ACK flags
+	dataSet[dataOffset] = 0x18
+	dataOffset += 1
+
+	// Field 10: DIRECTION (1 byte) - 0=ingress, 1=egress
+	dataSet[dataOffset] = 0x01
+	dataOffset += 1
+
+	// Field 11: PKTS (8 bytes)
+	binary.BigEndian.PutUint64(dataSet[dataOffset:dataOffset+8], uint64(traffic.Packets))
+	dataOffset += 8
+
+	// Field 12: flowStartMilliseconds (8 bytes)
+	flowStart := uint64(time.Now().UnixMilli())
+	binary.BigEndian.PutUint64(dataSet[dataOffset:dataOffset+8], flowStart)
+	dataOffset += 8
+
+	// Field 13: flowEndMilliseconds (8 bytes)
+	flowEnd := uint64(time.Now().UnixMilli() + 1000) // 1 second later
+	binary.BigEndian.PutUint64(dataSet[dataOffset:dataOffset+8], flowEnd)
+	dataOffset += 8
+
+	// Field 14: biflowDirection (1 byte)
+	dataSet[dataOffset] = 0x01
+	dataOffset += 1
+
+	// Field 15: newConnectionDeltaCount (4 bytes)
+	binary.BigEndian.PutUint32(dataSet[dataOffset:dataOffset+4], 1)
+	dataOffset += 4
+
+	// Field 16: Connection client IPv4 address (4 bytes)
+	copy(dataSet[dataOffset:dataOffset+4], traffic.SourceIP.To4())
+	dataOffset += 4
+
+	// Field 17: Connection client transport port (2 bytes)
+	binary.BigEndian.PutUint16(dataSet[dataOffset:dataOffset+2], traffic.SourcePort)
+	dataOffset += 2
+
+	// Field 18: Connection server IPv4 address (4 bytes)
+	copy(dataSet[dataOffset:dataOffset+4], traffic.DestinationIP.To4())
+	dataOffset += 4
+
+	// Field 19: Connection server transport port (2 bytes)
+	binary.BigEndian.PutUint16(dataSet[dataOffset:dataOffset+2], traffic.DestinationPort)
+	dataOffset += 2
+
+	// Field 20: observationPointId (8 bytes)
+	binary.BigEndian.PutUint64(dataSet[dataOffset:dataOffset+8], 1)
+	dataOffset += 8
+
+	// Field 21: IP_PROTOCOL_VERSION (1 byte) - IPv4 = 4
+	dataSet[dataOffset] = 4
+	dataOffset += 1
+
+	// Field 22: PROTOCOL (1 byte) - TCP = 6, UDP = 17
+	var protocolNum uint8 = 6 // Default to TCP
+	if traffic.Protocol == "UDP" {
+		protocolNum = 17
+	}
+	dataSet[dataOffset] = protocolNum
+	dataOffset += 1
+
+	// Field 23: APPLICATION_ID (4 bytes) - Generic application
+	binary.BigEndian.PutUint32(dataSet[dataOffset:dataOffset+4], 80) // HTTP application
+	dataOffset += 4
 
 	// --- IPFIX Message Header ---
 	totalLen := 16 + len(templateSet) + len(dataSet)
@@ -149,7 +371,7 @@ func (i *IpFix) generateIPFIXPacket(traffic Traffic) []byte {
 	binary.BigEndian.PutUint16(packet[2:4], uint16(totalLen))
 	binary.BigEndian.PutUint32(packet[4:8], uint32(time.Now().Unix()))
 	binary.BigEndian.PutUint32(packet[8:12], 1)    // Sequence Number
-	binary.BigEndian.PutUint32(packet[12:16], 256) // Observation Domain ID
+	binary.BigEndian.PutUint32(packet[12:16], 257) // Observation Domain ID matches Template ID
 
 	// Copy template set and data set into packet
 	copy(packet[16:], templateSet)
@@ -177,4 +399,63 @@ func (i *IpFix) sendIPFIX(packet []byte) {
 		return
 	}
 	fmt.Println("IPFIX packet sent successfully")
+}
+
+// Helper function to verify the template structure matches the specification
+func (i *IpFix) verifyTemplateStructure() {
+	fmt.Println("=== IPFIX Template Structure Verification ===")
+	fmt.Println("Set 1 [id=2] (Data Template): 257")
+	fmt.Println("  FlowSet Id: Data Template (V10 [IPFIX]) (2)")
+	fmt.Println("  FlowSet Length: 116")
+	fmt.Println("  Template (Id = 257, Count = 23)")
+	fmt.Println("    Template Id: 257")
+	fmt.Println("    Field Count: 23")
+
+	fields := []struct {
+		name       string
+		id         int
+		length     int
+		enterprise bool
+		pen        int
+	}{
+		{"SRC_MAC", 56, 6, false, 0},
+		{"SOURCE_MAC", 81, 6, false, 0},
+		{"DESTINATION_MAC", 80, 6, false, 0},
+		{"DST_MAC", 57, 6, false, 0},
+		{"IP_SRC_ADDR", 8, 4, false, 0},
+		{"IP_DST_ADDR", 12, 4, false, 0},
+		{"L4_SRC_PORT", 7, 2, false, 0},
+		{"L4_DST_PORT", 11, 2, false, 0},
+		{"TCP_FLAGS", 6, 1, false, 0},
+		{"DIRECTION", 61, 1, false, 0},
+		{"PKTS", 2, 8, false, 0},
+		{"flowStartMilliseconds", 152, 8, false, 0},
+		{"flowEndMilliseconds", 153, 8, false, 0},
+		{"biflowDirection", 239, 1, false, 0},
+		{"newConnectionDeltaCount", 278, 4, false, 0},
+		{"Connection client IPv4 address", 12236, 4, true, 9},
+		{"Connection client transport port", 12240, 2, true, 9},
+		{"Connection server IPv4 address", 12237, 4, true, 9},
+		{"Connection server transport port", 12241, 2, true, 9},
+		{"observationPointId", 138, 8, false, 0},
+		{"IP_PROTOCOL_VERSION", 60, 1, false, 0},
+		{"PROTOCOL", 4, 1, false, 0},
+		{"APPLICATION_ID", 95, 4, false, 0},
+	}
+
+	for i, field := range fields {
+		if field.enterprise {
+			fmt.Printf("    Field (%d/23): %s\n", i+1, field.name)
+			fmt.Printf("      1... .... .... .... = Pen provided: Yes\n")
+			fmt.Printf("      .%015b = Type: %s (%d)\n", field.id, field.name, field.id)
+			fmt.Printf("      Length: %d\n", field.length)
+			fmt.Printf("      PEN: ciscoSystems (%d)\n", field.pen)
+		} else {
+			fmt.Printf("    Field (%d/23): %s\n", i+1, field.name)
+			fmt.Printf("      0... .... .... .... = Pen provided: No\n")
+			fmt.Printf("      .%015b = Type: %s (%d)\n", field.id, field.name, field.id)
+			fmt.Printf("      Length: %d\n", field.length)
+		}
+	}
+	fmt.Println("=== End Template Structure ===")
 }
